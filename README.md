@@ -25,11 +25,6 @@ Mac adresses are hid for privacy reasons
 
 ## Requirements
 
-### Python Dependencies
-```
-pip install bleak requests tkinter
-```
-
 ### Data Files (Optional)
 - `mac_vendors.json` - MAC address to vendor mapping
 - `manufacturer_ids.json` - BLE manufacturer ID database
@@ -39,18 +34,18 @@ pip install bleak requests tkinter
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/cyberble-pro.git
-cd cyberble-pro
+git clone https://github.com/CyberNilsen/CyberBLE
+cd CyberBLE
 ```
 
 2. Install required dependencies:
 ```bash
-pip install bleak requests
+pip install -r requirements.txt
 ```
 
 3. Run the application:
 ```bash
-python cyberble_pro.py
+python CyberBLE.py
 ```
 
 ## Usage
