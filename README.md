@@ -117,7 +117,7 @@ Results are exported as JSON with the following structure:
   "scan_info": {
     "timestamp": "2025-01-15T10:30:00",
     "device_count": 5,
-    "tool": "CyberBLE Pro"
+    "tool": "CyberBLE"
   },
   "devices": [
     {
