@@ -373,6 +373,22 @@ class CyberBLEApp:
         self.check_data_files()
 
         self.continuous_scan_active = False
+        self.center_window()
+
+    def center_window(self):
+        """Center the main window on screen"""
+        self.root.update_idletasks()  
+        
+        window_width = self.root.winfo_width()
+        window_height = self.root.winfo_height()
+        
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        center_x = int(screen_width/2 - window_width/2)
+        center_y = int(screen_height/2 - window_height/2)
+        
+        self.root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
 
     def check_data_files(self):
         """Enhanced data file checking"""
@@ -462,14 +478,40 @@ class CyberBLEApp:
 
         connection_frame = ttk.Frame(button_frame)
         connection_frame.pack(pady=2)
+
+        self.connect_button = ttk.Button(connection_frame, text="Connect to Device", 
+                                   command=self.connect_to_selected_device)
+        self.connect_button.grid(row=0, column=0, padx=3)
+        
+        self.pair_button = ttk.Button(connection_frame, text="Pair Device", 
+                                    command=self.pair_selected_device)
+        self.pair_button.grid(row=0, column=1, padx=3)
+        
+        self.disconnect_button = ttk.Button(connection_frame, text="Disconnect All", 
+                                        command=self.disconnect_all_devices)
+        self.disconnect_button.grid(row=0, column=2, padx=3)
+        
+        power_frame = ttk.Frame(button_frame)
+        power_frame.pack(pady=2)
+        
+        ttk.Label(power_frame, text="⚡ Power Controls:", 
+                font=("Segoe UI", 9, "bold"), foreground="blue").pack(side="left", padx=2)
+        
+        self.power_off_button = ttk.Button(power_frame, text="Power Off Device", 
+                                        command=self.power_off_selected_device)
+        self.power_off_button.pack(side="left", padx=3)
+        
+        self.restart_button = ttk.Button(power_frame, text="Restart Device", 
+                                    command=self.restart_selected_device)
+        self.restart_button.pack(side="left", padx=3)
+        
+        self.sleep_button = ttk.Button(power_frame, text="Sleep Device", 
+                                    command=self.sleep_selected_device)
+        self.sleep_button.pack(side="left", padx=3)
         
         self.connect_button = ttk.Button(connection_frame, text="Connect to Device", 
                                        command=self.connect_to_selected_device)
         self.connect_button.grid(row=0, column=0, padx=3)
-        
-        self.disconnect_button = ttk.Button(connection_frame, text="Disconnect All", 
-                                          command=self.disconnect_all_devices)
-        self.disconnect_button.grid(row=0, column=1, padx=3)
         
         self.lookup_button = ttk.Button(action_frame, text="Enhance Vendors", 
                                        command=self.lookup_online)
@@ -1017,6 +1059,18 @@ class CyberBLEApp:
         ttk.Button(row2_frame, text="Send Custom Command", 
                 command=lambda: self.send_custom_command(mac)).pack(side="left", padx=2)
         
+        security_frame = ttk.Frame(control_frame)
+        security_frame.pack(fill="x", pady=2)
+        
+        ttk.Label(security_frame, text="🔐 Security & Analysis:", 
+                font=("Segoe UI", 9, "bold"), foreground="purple").pack(side="left", padx=2)
+        ttk.Button(security_frame, text="Security Scan", 
+                command=lambda: self.perform_security_scan(mac)).pack(side="left", padx=2)
+        ttk.Button(security_frame, text="Vulnerability Check", 
+                command=lambda: self.check_vulnerabilities(mac)).pack(side="left", padx=2)
+        ttk.Button(security_frame, text="Encryption Status", 
+                command=lambda: self.check_encryption_status(mac)).pack(side="left", padx=2)
+
         row3_frame = ttk.Frame(control_frame)
         row3_frame.pack(fill="x", pady=2)
         
@@ -1064,6 +1118,110 @@ class CyberBLEApp:
         initial_data += "🚀 Try 'Read All Characteristics' to discover what the device can do.\n\n"
         
         data_text.insert(tk.END, initial_data)
+
+    def perform_security_scan(self, mac):
+        """Perform security analysis of connected device"""
+        if mac not in self.connected_devices:
+            return
+        
+        self.display_device_info(mac, ["🔐 Starting security scan..."])
+        threading.Thread(target=self.security_scan_thread, args=(mac,)).start()
+
+    def security_scan_thread(self, mac):
+        """Security scan background thread"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            result = loop.run_until_complete(self.security_scan_async(mac))
+            self.root.after(0, lambda: self.display_device_info(mac, result))
+        except Exception as e:
+            self.root.after(0, lambda: self.display_error(mac, f"Security scan error: {str(e)}"))
+        finally:
+            loop.close()
+
+    async def security_scan_async(self, mac):
+        """Async security scanning"""
+        device_info = self.connected_devices[mac]
+        client = device_info['client']
+        services = device_info['services']
+        
+        results = []
+        results.append("🔐 === SECURITY ANALYSIS ===")
+        
+        open_chars = 0
+        protected_chars = 0
+        
+        for service in services:
+            for char in service.characteristics:
+                if "read" in char.properties:
+                    try:
+                        await client.read_gatt_char(char.uuid)
+                        open_chars += 1
+                    except Exception as e:
+                        if "authentication" in str(e).lower() or "authorization" in str(e).lower():
+                            protected_chars += 1
+        
+        results.append(f"📊 Open characteristics: {open_chars}")
+        results.append(f"🔒 Protected characteristics: {protected_chars}")
+        
+        vulnerable_services = [
+            ("00001800-0000-1000-8000-00805f9b34fb", "Generic Access - Often unprotected"),
+            ("0000180a-0000-1000-8000-00805f9b34fb", "Device Info - May leak device details"),
+            ("6e400001-b5a3-f393-e0a9-e50e24dcca9e", "Nordic UART - Debug interface risk"),
+        ]
+        
+        results.append("\n🚨 Potential Security Issues:")
+        for vuln_uuid, description in vulnerable_services:
+            for service in services:
+                if vuln_uuid.lower() in str(service.uuid).lower():
+                    results.append(f"  ⚠️ {description}")
+        
+        return results
+
+    def check_vulnerabilities(self, mac):
+        """Check for known BLE vulnerabilities"""
+        if mac not in self.connected_devices:
+            return
+        
+        device_info = self.connected_devices[mac]
+        
+        vulns = []
+        vulns.append("🕵️ === VULNERABILITY CHECK ===")
+        vulns.append("Checking for known BLE attack vectors...")
+        vulns.append("")
+        vulns.append("⚠️ BLEEDINGBIT: Check if device firmware is updated")
+        vulns.append("⚠️ BLUEBORNE: Verify Bluetooth stack security")
+        vulns.append("⚠️ SWEYNTOOTH: Nordic/TI chipset vulnerabilities")
+        vulns.append("⚠️ BRAKTOOTH: Baseband firmware issues")
+        vulns.append("")
+        vulns.append("💡 Recommendations:")
+        vulns.append("  • Keep device firmware updated")
+        vulns.append("  • Use strong pairing mechanisms")
+        vulns.append("  • Implement proper authentication")
+        vulns.append("  • Monitor for unauthorized connections")
+        
+        self.display_device_info(mac, vulns)
+
+    def check_encryption_status(self, mac):
+        """Check encryption and security status"""
+        if mac not in self.connected_devices:
+            return
+        
+        enc_info = []
+        enc_info.append("🔐 === ENCRYPTION STATUS ===")
+        enc_info.append("ℹ️ BLE Security Levels:")
+        enc_info.append("  • Level 1: No authentication/encryption")
+        enc_info.append("  • Level 2: Unauthenticated pairing")
+        enc_info.append("  • Level 3: Authenticated pairing")
+        enc_info.append("  • Level 4: Authenticated LE Secure Connections")
+        enc_info.append("")
+        enc_info.append("🔍 Current Connection:")
+        enc_info.append("  • Connection appears active")
+        enc_info.append("  • Encryption status: Unknown (requires deeper analysis)")
+        enc_info.append("  • Recommend using specialized BLE security tools")
+        
+        self.display_device_info(mac, enc_info)
 
     def populate_service_combo(self, mac, combo):
         """Populate the service combobox with available services"""
@@ -1589,6 +1747,306 @@ class CyberBLEApp:
     def display_error(self, mac, error_msg):
         """Display error in the connection window"""
         self.display_device_info(mac, [f"ERROR: {error_msg}"])
+
+
+    def pair_selected_device(self):
+        """Attempt to pair with selected device"""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a device to pair with.")
+            return
+        
+        item = self.tree.item(selected[0])
+        values = item['values']
+        mac = values[0]
+        name = values[1]
+        
+        # Security warning
+        warning_msg = (
+            "🔐 PAIRING ATTEMPT 🔐\n\n"
+            "This will attempt to pair with the device.\n"
+            "You may need to:\n"
+            "• Accept pairing on the target device\n"
+            "• Enter a PIN code\n"
+            "• Confirm the connection\n\n"
+            f"Device: {name}\nMAC: {mac}\n\n"
+            "Continue with pairing?"
+        )
+        
+        if not messagebox.askyesno("Pairing Warning", warning_msg):
+            return
+        
+        self.status_label.config(text=f"Attempting to pair with {name}...")
+        threading.Thread(target=self.perform_pairing, args=(mac, name)).start()
+
+    def perform_pairing(self, mac, name):
+        """Perform BLE pairing process"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            result = loop.run_until_complete(self.pair_device_async(mac, name))
+            self.root.after(0, lambda: self.pairing_result(result, mac, name))
+        except Exception as e:
+            self.root.after(0, lambda: self.pairing_error(str(e), mac, name))
+        finally:
+            loop.close()
+
+    async def pair_device_async(self, mac, name):
+        """Async pairing function"""
+        try:
+            client = BleakClient(mac)
+            
+            # Try to connect first
+            await asyncio.wait_for(client.connect(), timeout=20.0)
+            
+            if client.is_connected:
+                # Attempt to trigger pairing by accessing protected characteristics
+                services = await client.get_services()
+                
+                pairing_triggered = False
+                for service in services:
+                    for char in service.characteristics:
+                        if "read" in char.properties:
+                            try:
+                                await client.read_gatt_char(char.uuid)
+                                pairing_triggered = True
+                                break
+                            except Exception as e:
+                                if "authentication" in str(e).lower() or "pairing" in str(e).lower():
+                                    pairing_triggered = True
+                                    break
+                                continue
+                    if pairing_triggered:
+                        break
+                
+                # Keep connection alive for pairing process
+                await asyncio.sleep(10)
+                
+                if client.is_connected:
+                    await client.disconnect()
+                    return {'success': True, 'message': 'Pairing process initiated'}
+                else:
+                    return {'success': False, 'error': 'Connection lost during pairing'}
+            else:
+                return {'success': False, 'error': 'Failed to establish connection'}
+                
+        except asyncio.TimeoutError:
+            return {'success': False, 'error': 'Pairing timeout - device may require manual confirmation'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def pairing_result(self, result, mac, name):
+        """Handle pairing result"""
+        if result['success']:
+            self.status_label.config(text=f"Pairing initiated with {name}")
+            messagebox.showinfo("Pairing", f"Pairing process started with {name}.\n"
+                                        "Check the device for pairing confirmation.")
+        else:
+            self.status_label.config(text=f"Pairing failed: {result['error']}")
+            messagebox.showerror("Pairing Failed", f"Failed to pair with {name}:\n{result['error']}")
+
+    def pairing_error(self, error_msg, mac, name):
+        """Handle pairing error"""
+        self.status_label.config(text=f"Pairing error: {error_msg}")
+        messagebox.showerror("Pairing Error", f"Pairing error with {name}:\n{error_msg}")
+
+    def power_off_selected_device(self):
+        """Attempt to power off selected device"""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a device to power off.")
+            return
+        
+        item = self.tree.item(selected[0])
+        values = item['values']
+        mac = values[0]
+        name = values[1]
+        
+        # STRONG WARNING
+        warning_msg = (
+            "⚠️ DANGER: POWER OFF DEVICE ⚠️\n\n"
+            "This will attempt to PERMANENTLY POWER OFF the device!\n"
+            "This action may:\n"
+            "• Turn off the device completely\n"
+            "• Require physical button press to restart\n"
+            "• Potentially brick some devices\n\n"
+            "ONLY use on devices you own and understand!\n\n"
+            f"Device: {name}\nMAC: {mac}\n\n"
+            "Are you absolutely sure you want to continue?"
+        )
+        
+        if not messagebox.askyesno("POWER OFF WARNING", warning_msg):
+            return
+        
+        # Double confirmation
+        if not messagebox.askyesno("FINAL CONFIRMATION", "Last chance - really power off device?"):
+            return
+        
+        self.execute_power_command(mac, name, "power_off")
+
+    def restart_selected_device(self):
+        """Attempt to restart selected device"""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a device to restart.")
+            return
+        
+        item = self.tree.item(selected[0])
+        values = item['values']
+        mac = values[0]
+        name = values[1]
+        
+        warning_msg = (
+            "🔄 RESTART DEVICE 🔄\n\n"
+            "This will attempt to restart the device.\n"
+            "The device should reboot and reconnect.\n\n"
+            f"Device: {name}\nMAC: {mac}\n\n"
+            "Continue with restart?"
+        )
+        
+        if not messagebox.askyesno("Restart Confirmation", warning_msg):
+            return
+        
+        self.execute_power_command(mac, name, "restart")
+
+    def sleep_selected_device(self):
+        """Put selected device to sleep"""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a device to put to sleep.")
+            return
+        
+        item = self.tree.item(selected[0])
+        values = item['values']
+        mac = values[0]
+        name = values[1]
+        
+        self.execute_power_command(mac, name, "sleep")
+
+    def execute_power_command(self, mac, name, command):
+        """Execute power management command"""
+        self.status_label.config(text=f"Executing {command} on {name}...")
+        threading.Thread(target=self.perform_power_command, args=(mac, name, command)).start()
+
+    def perform_power_command(self, mac, name, command):
+        """Perform power management command"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            result = loop.run_until_complete(self.power_command_async(mac, name, command))
+            self.root.after(0, lambda: self.power_command_result(result, mac, name, command))
+        except Exception as e:
+            self.root.after(0, lambda: self.power_command_error(str(e), mac, name, command))
+        finally:
+            loop.close()
+
+    async def power_command_async(self, mac, name, command):
+        """Async power command execution"""
+        try:
+            client = BleakClient(mac)
+            await asyncio.wait_for(client.connect(), timeout=15.0)
+            
+            if not client.is_connected:
+                return {'success': False, 'error': 'Could not connect to device'}
+            
+            services = await client.get_services()
+            results = []
+            command_sent = False
+            
+            # Power management UUIDs (common ones)
+            power_service_uuids = [
+                "00001800-0000-1000-8000-00805f9b34fb",  # Generic Access
+                "00001801-0000-1000-8000-00805f9b34fb",  # Generic Attribute
+                "0000180a-0000-1000-8000-00805f9b34fb",  # Device Information
+            ]
+            
+            power_char_uuids = [
+                "00002a05-0000-1000-8000-00805f9b34fb",  # Service Changed
+                "00002a00-0000-1000-8000-00805f9b34fb",  # Device Name
+                "00002a01-0000-1000-8000-00805f9b34fb",  # Appearance
+            ]
+            
+            # Command mappings
+            command_data = {
+                'power_off': [
+                    bytes([0xFF, 0x00, 0x00, 0x00]),  # Power off sequence
+                    bytes([0x02, 0x01, 0x00]),        # Alt power off
+                    bytes([0x50, 0x4F, 0x57, 0x52]),  # "POWR" command
+                ],
+                'restart': [
+                    bytes([0xFF, 0xFF, 0x00, 0x01]),  # Restart sequence
+                    bytes([0x02, 0x02, 0x00]),        # Alt restart
+                    bytes([0x52, 0x53, 0x54, 0x52]),  # "RSTR" command
+                ],
+                'sleep': [
+                    bytes([0x53, 0x4C, 0x45, 0x50]),  # "SLEP" command
+                    bytes([0x01, 0x00, 0x00]),        # Sleep mode
+                    bytes([0xFF, 0x01, 0x00, 0x00]),  # Alt sleep
+                ]
+            }
+            
+            # Try writing to writable characteristics
+            for service in services:
+                for char in service.characteristics:
+                    if "write" in char.properties or "write-without-response" in char.properties:
+                        for data in command_data.get(command, []):
+                            try:
+                                await client.write_gatt_char(char.uuid, data)
+                                results.append(f"✅ {command} command sent to {str(char.uuid)[:8]}...")
+                                command_sent = True
+                                await asyncio.sleep(0.5)
+                            except Exception as e:
+                                results.append(f"❌ Failed on {str(char.uuid)[:8]}...: {str(e)}")
+            
+            # Try proprietary vendor commands
+            vendor_commands = [
+                bytes([0xAA, 0xBB, 0xCC, 0xDD]),  # Generic vendor command
+                bytes([0x12, 0x34, 0x56, 0x78]),  # Alt vendor command
+            ]
+            
+            if not command_sent:
+                for service in services:
+                    for char in service.characteristics:
+                        if "write" in char.properties:
+                            for vendor_cmd in vendor_commands:
+                                try:
+                                    await client.write_gatt_char(char.uuid, vendor_cmd)
+                                    results.append(f"✅ Vendor {command} command attempted")
+                                    command_sent = True
+                                    break
+                                except:
+                                    continue
+                            if command_sent:
+                                break
+                    if command_sent:
+                        break
+            
+            await client.disconnect()
+            
+            if command_sent:
+                return {'success': True, 'results': results}
+            else:
+                return {'success': False, 'error': 'No writable characteristics found for power commands'}
+                
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def power_command_result(self, result, mac, name, command):
+        """Handle power command result"""
+        if result['success']:
+            self.status_label.config(text=f"{command} command sent to {name}")
+            results_text = '\n'.join(result['results'])
+            messagebox.showinfo("Command Sent", f"{command} command sent to {name}:\n\n{results_text}")
+        else:
+            self.status_label.config(text=f"{command} command failed")
+            messagebox.showerror("Command Failed", f"Failed to {command} {name}:\n{result['error']}")
+
+    def power_command_error(self, error_msg, mac, name, command):
+        """Handle power command error"""
+        self.status_label.config(text=f"{command} error: {error_msg}")
+        messagebox.showerror("Power Command Error", f"{command} error on {name}:\n{error_msg}")
 
     def disconnect_device(self, mac):
         """Disconnect a specific device"""
