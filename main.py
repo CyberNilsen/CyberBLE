@@ -352,7 +352,7 @@ class CyberBLEApp:
     def __init__(self, root):
         self.root = root
         self.root.title("CyberBLE - Advanced BLE Device Profiler")
-        self.root.geometry("1100x870")
+        self.root.geometry("1100x950")
         self.root.resizable(True, True)
 
         style = ttk.Style()
